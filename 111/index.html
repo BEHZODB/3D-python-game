@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="uz">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RASH-modul Test Baholash</title>
+    <style>
+        :root {
+            font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        }
+
+        body {
+            max-width: 1100px;
+            margin: 18px auto;
+            padding: 18px;
+            background: #f7f8fb;
+            color: #111
+        }
+
+        h1 {
+            font-size: 20px;
+            margin: 0 0 12px
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px
+        }
+
+        input[type=number] {
+            width: 80px
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px
+        }
+
+        th,
+        td {
+            border: 1px solid #dcdce6;
+            padding: 6px;
+            text-align: center;
+            font-size: 13px
+        }
+
+        th {
+            background: #fff
+        }
+
+        .small {
+            font-size: 12px;
+            color: #555
+        }
+
+        button {
+            background: #2b6df6;
+            color: white;
+            border: 0;
+            padding: 8px 10px;
+            border-radius: 6px;
+            cursor: pointer
+        }
+
+        button.ghost {
+            background: #eef2ff;
+            color: #2b6df6
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 80px
+        }
+
+        .result {
+            margin-top: 12px
+        }
+
+        .download {
+            margin-left: 8px
+        }
+
+        .muted {
+            color: #666;
+            font-size: 13px
+        }
+
+        .warning {
+            color: #b44
+        }
+
+        .note {
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 8px
+        }
+    </style>
+</head>
+
+<body>
+    <h1>RASH-modul bilan test baholovchi sayt (HTML/CSS/JS)</h1>
+    <p class="small">Ishlatish: test uzunligini kiriting (masalan 55). Ism va 0/1 orqali javoblarni jadvalga kiriting
+        yoki CSV joylang. "Hisobla" tugmasi natijalarni chiqaradi — oddiy (raw) ball va RASH-modul bilan
+        og'irlashtirilgan ball.</p>
+
+    <div class="controls">
+        <label>Test savollari soni: <input id="itemsCount" type="number" min="1" value="55"></label>
+        <button id="setCols">Jadvalni yarat</button>
+        <button id="addRow" class="ghost">Yagona o'quvchi qo'shish</button>
+        <div style="flex:1"></div>
+        <div class="actions">
+            <button id="compute">Hisobla</button>
+            <button id="download" class="ghost">CSV yuklab olish</button>
+        </div>
+    </div>
+
+    <div class="note">
+        <div class="muted">CSV format: har bir qator — <strong>Ism, javob1, javob2, ..., javobN</strong>. Javoblar 0
+            yoki 1 bo'lishi kerak. Masalan: <em>Ali,1,0,1,1,...</em></div>
+        <textarea id="csvArea"
+            placeholder="Bu yerga CSV ni joylang (ixtiyoriy). CSV joylasangiz 'CSV dan yukla' tugmasi bilan jadval to'ldiriladi."></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px"><button id="loadCsv">CSV dan yukla</button><button
+                id="clearTable" class="ghost">Jadvalni tozalash</button></div>
+    </div>
+
+    <div id="tableWrap"></div>
+
+    <div class="result" id="resultArea"></div>
+
+    <script>
+        // Helper to create table with columns
+        const tableWrap = document.getElementById('tableWrap');
+        const itemsCountInput = document.getElementById('itemsCount');
+        const setColsBtn = document.getElementById('setCols');
+        const addRowBtn = document.getElementById('addRow');
+        const computeBtn = document.getElementById('compute');
+        const downloadBtn = document.getElementById('download');
+        const csvArea = document.getElementById('csvArea');
+        const loadCsvBtn = document.getElementById('loadCsv');
+        const clearTableBtn = document.getElementById('clearTable');
+        const resultArea = document.getElementById('resultArea');
+
+        let itemsCount = parseInt(itemsCountInput.value, 10) || 55;
+
+        function createTable(count) {
+            itemsCount = count;
+            tableWrap.innerHTML = '';
+            const table = document.createElement('table');
+            table.id = 'dataTable';
+            const thead = document.createElement('thead');
+            const hrow = document.createElement('tr');
+            hrow.innerHTML = '<th>Ism</th>' + Array.from({ length: count }, (_, i) => `<th>#${i + 1}</th>`).join('') + '<th class="small">Amal</th>';
+            thead.appendChild(hrow);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            table.appendChild(tbody);
+            tableWrap.appendChild(table);
+        }
+
+        function addEmptyRow(name = '') {
+            const tbody = document.querySelector('#dataTable tbody');
+            if (!tbody) return;
+            const tr = document.createElement('tr');
+            const cells = [];
+            const nameCell = document.createElement('td');
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.value = name;
+            nameInput.placeholder = "Ism";
+            nameInput.style.width = '110px';
+            nameCell.appendChild(nameInput);
+            tr.appendChild(nameCell);
+            for (let i = 0; i < itemsCount; i++) {
+                const td = document.createElement('td');
+                const inp = document.createElement('input');
+                inp.type = 'number'; inp.min = 0; inp.max = 1; inp.value = '';
+                inp.style.width = '42px';
+                inp.title = '0 yoki 1 yozing';
+                td.appendChild(inp);
+                tr.appendChild(td);
+            }
+            const actionTd = document.createElement('td');
+            const del = document.createElement('button'); del.textContent = 'Ochirish'; del.className = 'ghost';
+            del.onclick = () => { tr.remove(); };
+            actionTd.appendChild(del);
+            tr.appendChild(actionTd);
+            tbody.appendChild(tr);
+        }
+
+        setColsBtn.addEventListener('click', () => {
+            const c = parseInt(itemsCountInput.value, 10);
+            if (!c || c < 1) return alert('Savollar sonini togri kiriting');
+            createTable(c);
+        });
+
+        addRowBtn.addEventListener('click', () => {
+            if (!document.getElementById('dataTable')) createTable(itemsCount);
+            addEmptyRow();
+        });
+
+        loadCsvBtn.addEventListener('click', () => {
+            const txt = csvArea.value.trim();
+            if (!txt) return alert('CSV kiritilsin.');
+            const lines = txt.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            if (lines.length === 0) return alert("CSV bo'sh.");
+            // parse
+            const rows = lines.map(l => l.split(',').map(s => s.trim()));
+            const len = rows[0].length - 1;
+            if (len < 1) return alert('Kamida 1 ta savol bolishi kerak.');
+            itemsCountInput.value = len;
+            createTable(len);
+            rows.forEach(r => {
+                const name = r[0] || '';
+                addEmptyRow(name);
+                const last = document.querySelector('#dataTable tbody tr:last-child');
+                for (let i = 0; i < len; i++) {
+                    const cellInp = last.querySelectorAll('input')[i + 1]; // first input is name
+                    cellInp.value = r[i + 1] !== undefined ? r[i + 1] : '';
+                }
+            });
+        });
+
+        clearTableBtn.addEventListener('click', () => {
+            if (document.getElementById('dataTable')) {
+                document.getElementById('dataTable').remove();
+            }
+            tableWrap.innerHTML = '';
+            resultArea.innerHTML = '';
+        });
+
+        computeBtn.addEventListener('click', () => {
+            const table = document.getElementById('dataTable');
+            if (!table) return alert('Avval jadval yarating va oquvchilarni kiriting');
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            if (rows.length === 0) return alert('Jadvalda hech kim yoq.');
+            const N = rows.length;
+            const M = itemsCount;
+            // Build response matrix
+            const names = [];
+            const matrix = [];
+            for (const r of rows) {
+                const inputs = r.querySelectorAll('input');
+                const name = inputs[0].value.trim() || 'Ismi yoq';
+                names.push(name);
+                const answers = [];
+                for (let i = 1; i <= M; i++) {
+                    const v = inputs[i].value.trim();
+                    const num = v === '' ? 0 : Number(v);
+                    answers.push((num === 1) ? 1 : 0);
+                }
+                matrix.push(answers);
+            }
+
+            // raw scores
+            const raw = matrix.map(arr => arr.reduce((s, x) => s + x, 0));
+
+            // item proportions
+            const p = Array.from({ length: M }, (_, j) => matrix.reduce((s, row) => s + row[j], 0) / N);
+            const eps = 0.01; // avoid division by zero
+            const inv = p.map(x => 1 / (x + eps));
+            const invSum = inv.reduce((s, x) => s + x, 0);
+            // normalize so sum(weights) == M (so max possible weighted score = M)
+            const weights = inv.map(x => x * (M / invSum));
+
+            // weighted scores
+            const weighted = matrix.map(row => row.reduce((s, x, i) => s + x * weights[i], 0));
+
+            // prepare result table
+            let html = '<h3>Natijalar</h3>';
+            html += '<div class="muted small">Har bir savol uchun p (toʻgʻri javob ulushi), ogʻirlik (weight) korsatildi.</div>';
+            html += '<table><thead><tr><th>Ism</th><th>Raw (oddiy)</th><th>RASH ogʻirlikli</th></tr></thead><tbody>';
+            for (let i = 0; i < N; i++) {
+                html += `<tr><td style="text-align:left">${escapeHtml(names[i])}</td><td>${(raw[i] / M * 100).toFixed(2)}%</td><td>${(weighted[i] / M * 100).toFixed(2)}%</td></tr>`;
+            }
+            html += '</tbody></table>';
+
+            // Show item stats
+            html += '<h4>Savol statistikasi</h4>';
+            html += '<table><thead><tr><th>#</th><th>p (proportion)</th><th>weight</th></tr></thead><tbody>';
+            for (let j = 0; j < M; j++) {
+                html += `<tr><td>#${j + 1}</td><td>${p[j].toFixed(3)}</td><td>${weights[j].toFixed(3)}</td></tr>`;
+            }
+            html += '</tbody></table>';
+
+            // Offer CSV for download
+            html += '<div style="margin-top:10px">&nbsp;</div>';
+            resultArea.innerHTML = html;
+
+            // Prepare CSV for download
+            const outRows = [];
+            outRows.push(['Ism', 'Raw'].concat(Array.from({ length: M }, (_, i) => `Q${i + 1}`)).join(','));
+            for (let i = 0; i < N; i++) {
+                const rowStr = [escapeCsv(names[i]), raw[i].toString(), weighted[i].toFixed(6)].concat(matrix[i].map(x => x.toString())).join(',');
+                outRows.push(rowStr);
+            }
+            const csvContent = outRows.join('\n');
+            downloadBtn.onclick = () => {
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'results.csv'; document.body.appendChild(a); a.click(); a.remove();
+                URL.revokeObjectURL(url);
+            };
+
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            // handled after compute - if user clicks before compute, warn
+            if (!resultArea.innerHTML) return alert('Avval "Hisobla" tugmasini bosing');
+        });
+
+        // small helpers
+        function escapeHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        function escapeCsv(s) { if (s.includes(',') || s.includes('\"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"'; return s; }
+
+        // init
+        createTable(itemsCount);
+    </script>
+</body>
+
+</html>
